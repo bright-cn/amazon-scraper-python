@@ -1,53 +1,113 @@
-# Amazon Python 爬虫工具
+[![Scrape Amazon data with the Amazon Scraper API: products, reviews, sellers, search. Collect or discover by ASIN, keyword and UPC. Start free.](.github/banner.png)](https://brightdata.com/products/web-scraper/amazon?utm_source=github)
 
-使用 Python 获取亚马逊商品、评论、卖家及搜索结果，并以 JSON 格式输出。无需登录，也无需运行浏览器。本项目基于 [Bright Data 亚马逊爬虫 API](https://brightdata.com/products/web-scraper/amazon?utm_source=github)，使用 [Bright Data Python SDK](https://github.com/brightdata/sdk-python)。
+# amazon-scraper-python
 
-[快速开始](#快速开始) · [命令行工具](#命令行工具) · [其他-api-功能](#其他-api-功能) · [数据与注意事项](#数据与注意事项) · [故障排查](#故障排查) · [编程代理](#编程代理) · [API 文档](https://docs.brightdata.com/products/scrapers/amazon/introduction)
+[![Live check](https://github.com/brightdata/amazon-scraper-python/actions/workflows/live.yml/badge.svg)](https://github.com/brightdata/amazon-scraper-python/actions/workflows/live.yml)
+[![last verified](https://img.shields.io/badge/last%20verified-5%20Oct%202026-brightgreen)](https://github.com/brightdata/amazon-scraper-python/actions/workflows/live.yml) <!-- verified: rewritten by the daily run -->
 
-> 本译文说明如何使用仓库中的现有代码。命令、Python 标识符、环境变量、JSON 字段名及示例数据保持原样，以免影响运行。
+[Quickstart](#quickstart) · [Command](#or-run-it-as-a-command) · [Endpoints](#the-rest-of-the-api) · [Data](#the-data) · [Errors](#when-it-fails) · [Coding agents](#coding-agents) · [Docs](https://docs.brightdata.com/products/scrapers/amazon/introduction) · [Support](#support)
 
-## 快速开始
+Amazon products, reviews, sellers and search results as JSON, in Python. No
+login, no browser. Built on the
+[Bright Data Amazon Scraper API](https://brightdata.com/products/web-scraper/amazon?utm_source=github).
 
-需要 Python 3.10 或更高版本。
+Uses the [Bright Data Python SDK](https://github.com/brightdata/sdk-python).
+Full API docs:
+[Amazon Scraper API](https://docs.brightdata.com/products/scrapers/amazon/introduction).
+
+Also here: a one-command CLI for products, and the
+[Bright Data CLI](#coding-agents), which needs no Python at all.
+
+## Quickstart
+
+Python 3.10 or newer.
 
 ```bash
 pip install brightdata-sdk
 export BRIGHTDATA_API_TOKEN=YOUR_API_KEY
 ```
 
-在 [Bright Data 控制面板](https://brightdata.com/cp/setting/users)获取 API 令牌。如果虚拟环境位于项目内，也可以将令牌写入项目根目录的 `.env` 文件。
+Get a token from the
+[Bright Data control panel](https://brightdata.com/cp/setting/users). A `.env`
+file in the project root works too, as long as the virtualenv is inside the
+project.
 
-你也可以先运行一次 `npx -p @brightdata/cli bdata login`：它会打开浏览器完成登录，此后 SDK 可以使用已保存的凭据。编程代理无法代替你点击登录页面，请先自行完成登录。还没有账户？可以[创建账户](https://brightdata.com/cp/start)；新账户每月有 [5,000 个免费额度](https://docs.brightdata.com/general/account/billing-and-pricing/free-tier)。
+Or skip the token. Run `npx -p @brightdata/cli bdata login` once: it opens a
+browser, and from then on the SDK finds the stored credentials on its own, for
+you and for any coding agent working in that terminal. Agents cannot click
+through the login, so do it yourself first.
+
+No account yet? [Create one](https://brightdata.com/cp/start); new accounts get
+[5,000 free credits a month](https://docs.brightdata.com/general/account/billing-and-pricing/free-tier).
 
 ```python
 from brightdata import SyncBrightDataClient
 
 with SyncBrightDataClient(auto_create_zones=False) as client:
-    product = client.scrape.amazon.products(
-        "https://www.amazon.com/dp/B0CRMZHDG8"
-    ).data
+    product = client.scrape.amazon.products("https://www.amazon.com/dp/B0CRMZHDG8").data
     print(product["title"])
-    print(product["final_price"], product["currency"])
+    print(product["final_price"], product["currency"], "|", product["rating"], "stars |",
+          product["reviews_count"], "reviews")
 ```
 
-每条商品记录消耗一个额度。使用此项目时，请传入 `auto_create_zones=False`：否则 SDK 启动时会尝试为网络解锁器和搜索引擎 API 创建本项目不需要的区域；没有付款方式的账户可能因此失败。
+```
+STANLEY Quencher H2.0 Flow State Tumbler, 40 oz, Fuchsia
+39.95 USD | 4.7 stars | 205036 reviews
+```
 
-`products()` 接收的是**商品 URL**，不是单独的 ASIN。可将 ASIN 写成 `https://www.amazon.com/dp/ASIN`。
+One [credit](https://brightdata.com/pricing/web-scraper) per product, and the
+API quotes about 7 seconds per input.
 
-## 命令行工具
+Pass `auto_create_zones=False` every time. Left on, the SDK creates zones on
+startup for Web Unlocker and SERP, two other Bright Data products this scraper
+never touches, and zone creation fails on accounts without a payment method
+([sdk-python#57](https://github.com/brightdata/sdk-python/issues/57)).
 
-安装本仓库后，可一次获取多个商品，并将结果写入一个 JSON 文件：
+`products` takes a URL, not an ASIN, so write an ASIN as a `/dp/` URL as above.
+
+## Or run it as a command
+
+The command in this repo does the same for several ASINs and writes one JSON
+file.
 
 ```bash
 pip install git+https://github.com/brightdata/amazon-scraper-python
 amazon-scraper B0CRMZHDG8 B085DVHQ57
 ```
 
-也可以运行 `python -m amazon_scraper`。`--out PATH` 用于指定输出文件，默认文件名为 `amazon.json`。
+```
+Fetching 2 Amazon products: B0CRMZHDG8, B085DVHQ57
+One job for all of them. One credit per product.
+asking  2 products...
 
-命令同时接受 ASIN 和包含 ASIN 的商品 URL。重复的 ASIN 只会抓取一次。所有商品组成同一个任务；API 按记录而非按任务计费。
+got     B0CRMZHDG8: 100 fields (STANLEY Quencher H2.0 Flow State Tumbler, 40 oz,)
+got     B085DVHQ57: 99 fields (Owala FreeSip Stainless Steel Water Bottle 32 oz)
 
-需要在 Python 代码中逐个处理结果时，可导入 `scrape`。读取 `product` 前请先检查 `ok`：
+Saved 2 of 2 products as JSON to amazon.json
+```
+
+It takes a product URL just as happily as the ASIN inside it. The same ASIN
+twice is fetched once, so a duplicate costs nothing.
+
+In a terminal the `asking` line is replaced by this, updating in place, so you
+can see it is working and how long it has been going:
+
+```
+⠹ 2 products 0:00:14
+```
+
+```
+--out PATH   output file, default amazon.json
+```
+
+`python -m amazon_scraper` works too.
+
+Every ASIN you ask for goes into one job. The API bills per record, not per
+job, so ten products cost the same wait as one.
+
+Import it instead of running it, for `ok` and `error` per ASIN instead of raw
+rows. `scrape` never raises for one bad ASIN; check `ok` before reading
+`product`:
 
 ```python
 from amazon_scraper import scrape
@@ -59,30 +119,60 @@ for outcome in scrape(["B0CRMZHDG8", "B0ZZZZZZZZ"]):
         print(f"{outcome.asin} failed: {outcome.error}")
 ```
 
-## 其他 API 功能
+```
+B0CRMZHDG8: STANLEY Quencher H2.0 Flow State Tumbler, 40 oz, Fuchsia
+B0ZZZZZZZZ failed: The navigation resulted in a dead page (404 status code)
+```
 
-| 已知信息 | 所需数据 | SDK 调用 |
+## The rest of the API
+
+The command covers the first row of the table below. Every snippet here is
+complete and needs only `brightdata-sdk`: paste it as is. Every one of them
+runs in Actions each Monday, a smaller check runs every other day, and the
+badge at the top is the latest result.
+
+| you have | want | call |
 | --- | --- | --- |
-| 商品 URL | 商品记录 | `client.scrape.amazon.products(url)` |
-| 关键词 | 一页商品搜索结果 | `client.search.amazon.products(keyword=...)` |
-| 卖家 URL | 卖家记录 | `client.scrape.amazon.sellers(url)` |
-| 商品 URL | 商品评论 | `client.scrape.amazon.reviews(url)` |
+| a product URL | that product | `client.scrape.amazon.products(url)` |
+| a keyword | a page of search results | `client.search.amazon.products(keyword=...)`, see the note below |
+| a seller URL | that seller | `client.scrape.amazon.sellers(url)` |
+| a product URL | its reviews | `client.scrape.amazon.reviews(url)`, one credit per review, and see below |
+| a keyword, category URL, best sellers URL or UPC | full product records | no Python twin; see below |
 
-Amazon 调用的 `timeout` 参数以**秒**为单位，默认值为 240。
+The `timeout` argument is seconds, 240 by default for Amazon.
 
-### 评论抓取可能产生大量费用
+### Reviews are not run here, and the reason is money
 
-评论按**每条评论**计费。当前 SDK 虽接受 `numOfReviews`、`pastDays` 和 `keyWord`，却不会将这些参数发送到请求中。因此，`reviews(url, numOfReviews=20)` **不会**将结果限制为 20 条；它可能请求该商品的所有评论。需要限制数量时，请使用支持 `max_reviews` 的 REST 端点。详见 [sdk-python#62](https://github.com/brightdata/sdk-python/issues/62)。
+Reviews bill one credit per review. `reviews()` accepts `numOfReviews`,
+`pastDays` and `keyWord`, and sends none of them: the request is built from the
+URL alone ([sdk-python#62](https://github.com/brightdata/sdk-python/issues/62)).
+So `reviews(url, numOfReviews=20)` asks for every review, and nothing warns you.
 
-### 关键词搜索与商品发现并不相同
+The API does support a cap, `max_reviews`, and Bright Data's own documented
+sample sets it to 20. The SDK does not map `numOfReviews` onto it.
 
-`client.search.amazon.products(keyword=...)` 返回的是商品**搜索结果**记录，每条约有 30 个字段，并非完整的商品记录。当前 SDK 调用既不提供限制返回行数的参数，也不会发送 `pages_to_search`。
+The product in the Quickstart reports 205,036 reviews. That is one call. Until
+the SDK sends the cap, call the REST endpoint directly if you need a bounded
+slice.
 
-API 还支持按关键词、类目 URL、畅销商品 URL 或 UPC 发现完整商品记录，但此 Python SDK 目前没有与这些功能对应的方法。
+### Keyword search, and what it is not
 
-### 一次抓取多个商品
+`client.search.amazon.products(keyword=...)` returns rows from the product
+search dataset, about 30 fields each, one row per search result. It is not the
+same thing as the Node twin's keyword discovery, which returns full 119-field
+product records.
 
-向 `products()` 传入 URL 列表，会创建**一个任务**：
+It has no parameter that caps how many rows come back, and it does not send
+`pages_to_search`. It is not run here, because every snippet in this README
+reruns weekly.
+
+The API can also discover full product records by keyword, category URL, best
+sellers URL and UPC. This SDK has none of the four; the JavaScript SDK has all
+of them.
+
+### Several products, one job
+
+A list of URLs is one job, not one per product.
 
 ```python
 from brightdata import SyncBrightDataClient
@@ -94,79 +184,288 @@ with SyncBrightDataClient(auto_create_zones=False) as client:
     ])
     for result in results:
         row = result.data
-        print(row["asin"], row["final_price"], row["currency"])
+        print(row["asin"], "|", row["brand"], "|", row["final_price"], row["currency"])
 ```
 
-**请依据每条记录自身的 `asin` 判断它属于哪个商品，不要依赖 `result.url`。**API 返回记录的顺序可能与输入顺序不同，而 SDK 会按位置关联 URL 和记录；错误记录也可能被标记为 `success=True`。详见 [sdk-python#60](https://github.com/brightdata/sdk-python/issues/60)。
+```
+B0CRMZHDG8 | STANLEY | 39.95 USD
+B085DVHQ57 | Owala | 29.99 USD
+```
 
-### 现在触发，稍后获取
+Read which product a row is from its own `asin`, as above, never from
+`result.url`. The SDK pairs results with the URLs you passed by position, and
+the API returns rows in a different order each run, so `result.url` can name
+one product while `result.data` holds another. Every result is also marked
+`success=True`, including a dead ASIN's error row
+([sdk-python#60](https://github.com/brightdata/sdk-python/issues/60)).
 
-如果要抓取的商品较多，可以先触发任务并保存快照 ID，待任务就绪后再获取结果。快照可下载 30 天：
+### Trigger now, fetch later
+
+For anything bigger than a few products, do not block a process for an hour.
+Trigger, keep the snapshot id, fetch when ready. Snapshots stay downloadable
+for 30 days.
 
 ```python
 import time
+
 from brightdata import SyncBrightDataClient
 
 with SyncBrightDataClient(auto_create_zones=False) as client:
-    job = client.scrape.amazon.products_trigger(
-        "https://www.amazon.com/dp/B0CRMZHDG8"
-    )
+    job = client.scrape.amazon.products_trigger("https://www.amazon.com/dp/B0CRMZHDG8")
     print("snapshot:", job.snapshot_id)
-
-    while (status := client.scrape.amazon.products_status(
-        job.snapshot_id
-    )) not in ("ready", "failed"):
+    while (status := client.scrape.amazon.products_status(job.snapshot_id)) not in ("ready", "failed"):
         time.sleep(5)
-
     print("status:", status)
     record = client.scrape.amazon.products_fetch(job.snapshot_id)[0]
-    print(record["asin"], record["title"])
+    print("fetched:", record["asin"], "|", record["title"][:40])
 ```
 
-## 数据与注意事项
+```
+snapshot: sd_muars9x1e0ejmq4cx
+status: ready
+fetched: B0CRMZHDG8 | STANLEY Quencher H2.0 Flow State Tumbler
+```
 
-常用商品字段包括：
+## The data
 
-```text
+The fields most people want from a product:
+
+```
 asin  title  brand  final_price  currency  rating  reviews_count  availability
 ```
 
-本项目**没有写死字段列表**：API 返回的内容会进入 `result.data`，命令行工具也会将其写入 JSON 文件。完整字段表和真实输出示例见[英文 README](README.md)及 [`examples/sample_output.json`](examples/sample_output.json)。
+The code hardcodes no field list. Whatever the API returns lands in
+`result.data`, and in the command's file.
 
-API 元数据将 `seller_name`、`zipcode` 和 `coupon` 标记为个人数据（`pii: true`）。SDK 的 `get_metadata()` 会丢弃该标记；如果需要判断个人数据字段，应读取原始元数据端点。详见 [sdk-python#61](https://github.com/brightdata/sdk-python/issues/61)。
+The API marks 3 of these fields as personal data, with `pii: true` in the
+schema: `seller_name`, `zipcode` and `coupon`. `get_metadata()` drops that
+flag ([sdk-python#61](https://github.com/brightdata/sdk-python/issues/61)), so
+the table below reads the raw metadata endpoint instead.
 
-## 故障排查
+<!-- fields:start -->
+<details>
+<summary>All 119 fields, with type and description</summary>
 
-| 现象 | 处理方式 |
+Regenerated every day from the dataset schema, via the raw metadata
+endpoint, so it cannot go stale. A
+product carries the fields that apply to it: the sample file has 97
+of these 119, plus `timestamp` and `input`,
+which the schema does not list.
+
+| field | type | description |
+| --- | --- | --- |
+| `title` | text | Product title |
+| `seller_name` | text | Personal data. Seller name |
+| `brand` | text | Product brand |
+| `description` | text | A brief description of the product |
+| `initial_price` | price | Initial price |
+| `currency` | text | Currency of the product |
+| `availability` | text | Product availability |
+| `reviews_count` | number | Number of reviews |
+| `categories` | array | Product categories |
+| `parent_asin` | text | Parent ASIN of the product |
+| `asin` | text | Unique identifier for each product |
+| `buybox_seller` | text | Seller in the buy box |
+| `number_of_sellers` | number | Number of sellers for the product |
+| `root_bs_rank` | number | Best sellers rank in the general category |
+| `ISBN10` | text | ISBN-10 identifier for books |
+| `answered_questions` | number | Number of answered questions |
+| `domain` | url | URL of the product domain |
+| `images_count` | number | Number of images |
+| `url` | url | URL that links directly to the product |
+| `video_count` | number | Number of videos |
+| `image_url` | url | URL that links directly to the product image |
+| `item_weight` | text | Weight of the product |
+| `rating` | number | Product rating |
+| `product_dimensions` | text | Dimensions of the product |
+| `seller_id` | text | Unique identifier for each seller |
+| `image` | url | URL that links directly to the product image |
+| `date_first_available` | text | Date when the product first became available |
+| `discount` | text | Product discount information |
+| `model_number` | text | Model number of the product |
+| `manufacturer` | text | Manufacturer of the product |
+| `department` | text | Department to which the product belongs |
+| `plus_content` | boolean | Boolean indicating the presence of additional content |
+| `upc` | text | Universal Product Code |
+| `video` | boolean | Boolean indicating the presence of videos |
+| `top_review` | text | Top review for the product |
+| `final_price_high` | price | Highest value of the final price when it is a range |
+| `final_price` | price | Final price of the product |
+| `variations` | array | Details about the same product in different variations |
+| `delivery` | array | Delivery-related information |
+| `features` | array | Product features |
+| `format` | array | Books format-related information |
+| `buybox_prices` | object | Product price details |
+| `input_asin` | text | Input ASIN (currently inactive) |
+| `ingredients` | text | Ingredients of the product, relevant mostly for food products |
+| `origin_url` | url | Source page URL used to extract this record |
+| `bought_past_month` | number | Units bought in the past month (as shown by Amazon) |
+| `is_available` | boolean | Indication if the product is still available |
+| `root_bs_category` | text | best seller root category |
+| `bs_category` | text | best seller category |
+| `bs_rank` | number | best seller rank in the specific category |
+| `badge` | text | product badge. for example: #1 Best Seller or Amazons Choice |
+| `subcategory_rank` | array | Best Sellers rank entries by subcategory |
+| `amazon_choice` | boolean | Specifies if the product is amazons choice |
+| `images` | array | URLs of the product images |
+| `product_details` | array | Full product details |
+| `prices_breakdown` | object | Breakdown of list/typical pricing and deal status |
+| `country_of_origin` | text | Country of origin of the product |
+| `from_the_brand` | array | Brand-provided promotional media shown on the page |
+| `product_description` | array | Media embedded in the product description section |
+| `seller_url` | url | Seller storefront/profile URL on Amazon |
+| `customer_says` | text | customer_says |
+| `sustainability_features` | array | Sustainability badges/certifications with references |
+| `climate_pledge_friendly` | boolean | Whether the product shows the Climate Pledge Friendly badge |
+| `videos` | array | URLs of the products videos |
+| `other_sellers_prices` | array | Offers from other sellers for the same product |
+| `downloadable_videos` | array | Direct media URL |
+| `editorial_reviews` | array | The Editorial Reviews of the book |
+| `about_the_author` | text | About the author information |
+| `zipcode` | text | Personal data. ZIP/postal code used for delivery and availability estimates |
+| `coupon` | text | Personal data. coupon |
+| `sponsered` | boolean | sponsored |
+| `store_url` | url | The products store URL |
+| `ships_from` | text | Where the item ships from |
+| `city` | text | City related to shipping or seller/location context |
+| `customers_say` | object | Amazons Customers say summary extracted from reviews |
+| `max_quantity_available` | number | Maximum quantity allowed to add to cart |
+| `variations_values` | array | Variations and their possible values |
+| `language` | text | Language of the product page/content |
+| `return_policy` | text | Return policy text shown on the product page |
+| `inactive_buy_box` | object | Price information when the Buy Box is unavailable/inactive |
+| `buybox_seller_rating` | number | The rating of the buy box seller |
+| `premium_brand` | boolean | Is it premium brand |
+| `amazon_prime` | boolean | Does it have amazon prime delivery |
+| `coupon_description` | text | coupon description |
+| `all_badges` | array | all badges |
+| `sponsored` | boolean | Amazon Sponsored flag |
+| `variant_id` | text | Unique identifier for the specific variant |
+| `product_category` | text | Full breadcrumb path joined with separator |
+| `category_tree` | array | Category hierarchy as array of objects with name and url |
+| `availability_date` | text | Expected availability date for out-of-stock items |
+| `listing_has_variations` | boolean | Whether the listing has multiple variants |
+| `variant_attributes` | array | Current variant attributes as name/value pairs |
+| `variants` | array | Structured variant options grouped by type |
+| `seller_privacy_policy` | text | URL to seller privacy policy |
+| `seller_tos` | text | URL to seller terms of service |
+| `return_window` | number | Number of days for return window |
+| `target_countries` | array | Countries where product ships to |
+| `store_country` | text | store_country |
+| `category_urls` | array | category breadcrumbs |
+| `all_variations` | boolean | nput field for collecting all variations |
+| `safety_information` | text | Safety Information |
+| `subcategory_link` | array | Best Sellers link entries by subcategory |
+| `all_inactive_buy_box` | array | all inactive buy box information |
+| `is_frequently_returned_item_badge` | boolean | Indicates whether the badge is present |
+| `frequently_returned_item_message` | text | The text shown inside the warning box |
+| `is_customers_usually_keep` | boolean | Indicates whether customers usually keep this item |
+| `title_badge` | text | Title of the badge |
+| `review_images` | array | review_images |
+| `review_videos` | array | review_videos |
+| `also_viewed` | array | Customers also viewed |
+| `similar_items` | array | Consider a similar item |
+| `bought_past_month_text` | text | Units bought in the past month (as displayed by Amazon), in text format. |
+| `is_high_price` | boolean | Indicates whether the product is tagged as high price. |
+| `title_highlight` | text | Captures the supplementary marketing/highlight text that Amazon renders directly after the product title on the product page |
+| `title_clean` | text | The actual product title as defined by the seller/brand, excluding any Amazon-rendered highlight text that may appear next to/after it on the page |
+| `customers_say_topics` | array | Structured breakdown of the "Customers say" section |
+| `brand_url` | url | Product brand URL |
+| `variant_condition` | text | The condition of a product variant (e.g., New, Renewed, Refurbished - Excellent). |
+| `is_aplus_premium` | boolean | Indicates whether the product is Premium A+ |
+
+</details>
+<!-- fields:end -->
+
+<details>
+<summary>The start of a real output file, from <code>amazon-scraper B0CRMZHDG8</code></summary>
+
+```json
+{
+  "generated_at": "2026-09-21T04:54:18.105606+00:00",
+  "products": [
+    {
+      "asin": "B0CRMZHDG8",
+      "product": {
+        "title": "STANLEY Quencher H2.0 Flow State Tumbler, 40 oz, Fuchsia",
+        "seller_name": "Avrix Brands",
+        "brand": "STANLEY",
+        "description": "Constructed of recycled stainless steel for sustainable sipping, our 40 oz Quencher H2.0 offers maximum hydration with fewer refills. Commuting, studio workouts, day trips or your front porch\u2014you\u2019ll want this tumbler by your side. Thanks to Stanley\u2019s vacuum insulation, your water will stay ice-cold, hour after hour. The advanced FlowState\u2122 lid features a rotating cover with three positions: a straw opening designed to resist splashes while holding the reusable straw in place, a drink opening, and a full-cover top. The ergonomic handle includes comfort-grip inserts for easy carrying, and the narrow base fits just about any car cup holder.",
+        "initial_price": 45,
+        "currency": "USD",
+        "availability": "In Stock",
+        "reviews_count": 205036,
+        "categories": [
+          "Home & Kitchen",
+          "Kitchen & Dining",
+          "Storage & Organization",
+          "Thermoses",
+  ...
+```
+
+The whole file, one product with every field, is
+[examples/sample_output.json](examples/sample_output.json).
+
+</details>
+
+## When it fails
+
+| you see | what it means |
 | --- | --- |
-| `API token required but not found.` | 设置 `BRIGHTDATA_API_TOKEN`，或先完成 CLI 登录。 |
-| ASIN 对应的页面返回 404 | 检查 ASIN 是否输入错误。 |
-| API 没有返回该 ASIN 的记录 | 重新运行任务。 |
-| 任务在 240 秒后超时 | 重新运行，或适当提高调用的 `timeout`。 |
-| `Failed to fetch results: Request timeout after 30 seconds` | 任务可能已完成，但下载超时。此限制来自客户端每次 HTTP 请求的超时设置；仅提高抓取调用的 `timeout` 无效。 |
-| `AuthenticationError: Unauthorized (401)` | 检查 API 令牌是否正确。 |
+| `API token required but not found.` | Exit 2, before any request. Set the token. |
+| `failed  ASIN: The navigation resulted in a dead page (404 status code)` | Exit 1. No such product, usually a typo in the ASIN. |
+| `failed  ASIN: the API returned no row for this ASIN` | Exit 1. The job came back without a row for that input. Run it again. |
+| `failed  ASIN: timeout` | Exit 1. A request gives up after 240 seconds. Run it again. |
+| `failed  ASIN: Failed to fetch results: Request timeout after 30 seconds` | Exit 1. The job finished, but downloading it took longer than 30 seconds. Run it again. |
 
-命令行工具只要有一项商品抓取失败就会以状态码 1 退出，因此可以用其退出状态控制脚本流程。
+Any failure exits 1, so a run is safe to gate a script on.
 
-## 编程代理
+From the SDK, the same conditions look like this:
 
-不使用 Python 时，也可通过 Bright Data CLI 获取商品数据：
+| you see | what it means |
+| --- | --- |
+| `AuthenticationError: Unauthorized (401)` | The token is set but wrong. |
+| `result.success` is `False`, `result.status` is `"timeout"` | The SDK gave up waiting for the job, 240 seconds by default. Pass a larger `timeout` to the call, or run it again. |
+| `Failed to fetch results: Request timeout after 30 seconds` | The job finished; downloading it did not. That is the client's own limit on each HTTP request, `SyncBrightDataClient(timeout=30)`, not the `timeout` you pass to the call. Raising the call's `timeout` does not help. |
+| a dict in `result.data` with an `error` key | The API's answer for one input. `result.success` still says `True`; read the row. |
+
+## Coding agents
+
+No Python, nothing installed. Paste both lines; the first opens a browser
+once, or use `bdata login --device` over SSH and in CI:
 
 ```bash
 npx -p @brightdata/cli bdata login
 npx -p @brightdata/cli bdata pipelines amazon_product "https://www.amazon.com/dp/B0CRMZHDG8"
 ```
 
-`bdata pipelines list` 可列出可用类型。亚马逊相关类型包括 `amazon_product`、`amazon_product_reviews` 和 `amazon_product_search`；它们按记录消耗额度。
+`bdata pipelines list` prints every type. The Amazon ones are `amazon_product`,
+`amazon_product_reviews` and `amazon_product_search`. Each takes URLs, prints
+JSON, and costs one credit per record.
 
-托管环境中的代理还可以使用 [Bright Data MCP 服务器](https://github.com/brightdata/brightdata-mcp#which-tool-to-use)。亚马逊工具属于需要启用的 `ecommerce` 工具组：
+`npx skills add brightdata/skills` teaches Claude Code, Cursor and Codex these
+commands and the docs, so plain language works afterwards. Full guide:
+[Bright Data for your coding agent](https://docs.brightdata.com/quickstart-coding-agent).
 
-```text
-https://mcp.brightdata.com/mcp?token=YOUR_API_TOKEN&groups=ecommerce
-```
+No terminal, for a hosted assistant? The
+[Bright Data MCP server](https://github.com/brightdata/brightdata-mcp#which-tool-to-use)
+has Amazon tools in its `ecommerce` group, which is off unless you ask for it:
 
-## 支持与许可证
+    https://mcp.brightdata.com/mcp?token=YOUR_API_TOKEN&groups=ecommerce
 
-本仓库的问题请[提交 issue](https://github.com/brightdata/amazon-scraper-python/issues)。有关 API、账户或额度的问题，请联系 [Bright Data 支持团队](https://brightdata.zendesk.com/hc/en-us/requests/new)。
+An agent can also open the account itself, no signup form:
+[agent registration](https://brightdata.com/auth.md). Everything else Bright
+Data connects to, from LangChain to Zapier and n8n:
+[integrations](https://docs.brightdata.com/integrations/introduction).
 
-许可证：MIT。
+## Support
+
+Bugs in this repo:
+[open an issue](https://github.com/brightdata/amazon-scraper-python/issues), and
+[CONTRIBUTING.md](CONTRIBUTING.md) says what to put in it.
+Anything about the API, your account or your credits:
+[Bright Data support](https://brightdata.zendesk.com/hc/en-us/requests/new).
+
+## License
+
+MIT.
